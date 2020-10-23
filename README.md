@@ -4,6 +4,8 @@ This repo reproduce some bugs of [MongoDB C# Driver](https://github.com/mongodb/
 
 ## 1- Using `Contains()` with `false` Check
 
+Checking `Contains()` with `true` has NO error but with `false` ...
+
 ```csharp
 var selectedIds = new[] { ObjectId.GenerateNewId() };
 var result = postCollection
@@ -111,13 +113,13 @@ var result = postCollection
 
 ```csharp
 var result = postCollection
-	.AsQueryable()
-	.Select(p => new
-	{
-		Id = p.Id,
-		Comments = p.Comments.ToList()
-	})
-	.ToList();
+    .AsQueryable()
+    .Select(p => new
+    {
+        Id = p.Id,
+        Comments = p.Comments.ToList()
+    })
+    .ToList();
 ```
 
 ```ini
