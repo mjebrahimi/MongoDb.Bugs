@@ -21,14 +21,16 @@ namespace MongoDb.Bugs
         public void Contains_False()
         {
             var selectedIds = new[] { ObjectId.GenerateNewId() };
-            var result = postCollection
+
+            var query = postCollection
                 .AsQueryable()
-                .Where(p => selectedIds.Contains(p.Id) == false)
-                .ToList();
+                .Where(p => selectedIds.Contains(p.Id) == false);
+
+            var result = query.ToList();
         }
 
         [Fact]
-        public void AutoMapper_ProjectTo()
+        public void CustomProjection_WithAutoMapper()
         {
             var mapperConfiguration = new MapperConfiguration(config =>
             {
@@ -38,36 +40,100 @@ namespace MongoDb.Bugs
             });
             var mapper = mapperConfiguration.CreateMapper();
 
-            var result = postCollection
+            var query = postCollection
                  .AsQueryable()
-                 .ProjectTo<PostDto>(mapper.ConfigurationProvider)
+                 .ProjectTo<PostDto>(mapper.ConfigurationProvider);
+
+            var result = query
                  .ToList();
+        }
+
+        [Fact]
+        public void CustomProjection_WithoutAutoMapper()
+        {
+            var query = postCollection
+                .AsQueryable()
+                .Select(p => new PostDto
+                {
+                    Id = p.Id,
+                    Title = p.Title,
+                    Category = p.Category == null ? null : new PostDto.CategoryDto
+                    {
+                        Id = p.Id,
+                        Name = p.Category.Name,
+                    },
+                    Comments = p.Comments.Select(c => new PostDto.CommentDto
+                    {
+                        Id = c.Id,
+                        Text = c.Text
+                    })
+                });
+
+            var result = query.ToList();
+        }
+
+        [Fact]
+        public void CustomProjection_UsingJsonString()
+        {
+            ProjectionDefinition<Post, PostDto> project = @"
+{
+	'Category': {
+		'$cond': [{
+				'$eq': ['$Category', null]
+			}, null, {
+				'Id': '$Category._id',
+				'Name': '$Category.Name'
+			}
+		]
+	},
+	'Comments': {
+		'$map': {
+			'input': '$Comments',
+			'as': 'dtoEmbeddedComment',
+			'in': {
+				'Id': '$$dtoEmbeddedComment._id',
+				'Text': '$$dtoEmbeddedComment.Text'
+			}
+		}
+	},
+	'Id': '$_id',
+	'Title': '$Title',
+	'_id': 0
+}";
+
+            var query = postCollection
+                .Aggregate()
+                .Project(project);
+
+            var result = query.ToList();
         }
 
         [Fact]
         public void Contains_On_EmbeddedDocuments()
         {
-            var result = postCollection
+            var query = postCollection
                 .AsQueryable()
                 .Select(p => new
                 {
                     Id = p.Id,
                     Comments = p.Comments.Where(c => c.Text.Contains("test"))
-                })
-                .ToList();
+                });
+
+            var result = query.ToList();
         }
 
         [Fact]
         public void ToList_On_EmbeddedDocuments()
         {
-            var result = postCollection
+            var query = postCollection
                 .AsQueryable()
                 .Select(p => new
                 {
                     Id = p.Id,
                     Comments = p.Comments.ToList()
-                })
-                .ToList();
+                });
+
+            var result = query.ToList();
         }
     }
 }
